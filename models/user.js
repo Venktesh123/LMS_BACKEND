@@ -1,3 +1,4 @@
+// models/user.js
 const { Model, DataTypes } = require("sequelize");
 const bcrypt = require("bcryptjs");
 
@@ -15,7 +16,7 @@ module.exports = (sequelize) => {
       });
     }
 
-    // Method to check if password matches
+    // Method to check if password matches - used by auth controller
     async comparePassword(candidatePassword) {
       return await bcrypt.compare(candidatePassword, this.password);
     }

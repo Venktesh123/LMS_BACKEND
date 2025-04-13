@@ -1,12 +1,13 @@
-const { Event, sequelize } = require("../models");
+// controllers/eventController.js
+const eventRepository = require("../repository/eventRepository");
+const catchAsyncErrors = require("../middleware/catchAsyncErrors");
+const { ErrorHandler } = require("../middleware/errorHandler");
 const { uploadFileToS3 } = require("../utils/s3Helper");
 
 // Get all events
-const getAllEvents = async (req, res) => {
+exports.getAllEvents = catchAsyncErrors(async (req, res, next) => {
   try {
-    const events = await Event.findAll({
-      order: [["date", "ASC"]],
-    });
+    const events = await eventRepository.findAll();
 
     return res.status(200).json({
       success: true,
@@ -15,23 +16,17 @@ const getAllEvents = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in getAllEvents:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Server Error",
-    });
+    return next(new ErrorHandler("Server Error", 500));
   }
-};
+});
 
 // Get event by ID
-const getEventById = async (req, res) => {
+exports.getEventById = catchAsyncErrors(async (req, res, next) => {
   try {
-    const event = await Event.findByPk(req.params.id);
+    const event = await eventRepository.findById(req.params.id);
 
     if (!event) {
-      return res.status(404).json({
-        success: false,
-        error: "Event not found",
-      });
+      return next(new ErrorHandler("Event not found", 404));
     }
 
     return res.status(200).json({
@@ -40,38 +35,34 @@ const getEventById = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in getEventById:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Server Error",
-    });
+    return next(new ErrorHandler("Server Error", 500));
   }
-};
+});
 
 // Create a new event
-const createEvent = async (req, res) => {
-  const transaction = await sequelize.transaction();
-
+exports.createEvent = catchAsyncErrors(async (req, res, next) => {
   try {
     const { name, description, date, time, location, link } = req.body;
 
     // Validate required fields
     if (!name || !date || !time || !location || !link) {
-      await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        error:
+      return next(
+        new ErrorHandler(
           "Please provide all required fields: name, date, time, location, link",
-      });
+          400
+        )
+      );
     }
 
     // Validate link format
     const urlPattern = /^https?:\/\/.+/;
     if (!urlPattern.test(link)) {
-      await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        error: "Link must be a valid URL starting with http:// or https://",
-      });
+      return next(
+        new ErrorHandler(
+          "Link must be a valid URL starting with http:// or https://",
+          400
+        )
+      );
     }
 
     // Handle image upload
@@ -87,11 +78,12 @@ const createEvent = async (req, res) => {
         "image/gif",
       ];
       if (!allowedTypes.includes(imageFile.mimetype)) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          error: "Invalid image type. Allowed types: JPEG, PNG, JPG, GIF",
-        });
+        return next(
+          new ErrorHandler(
+            "Invalid image type. Allowed types: JPEG, PNG, JPG, GIF",
+            400
+          )
+        );
       }
 
       // Upload to S3
@@ -99,96 +91,72 @@ const createEvent = async (req, res) => {
         const uploadResult = await uploadFileToS3(imageFile, "events");
         imageUrl = uploadResult.url;
       } catch (uploadError) {
-        await transaction.rollback();
         console.error("Error uploading image:", uploadError);
-        return res.status(500).json({
-          success: false,
-          error: "Failed to upload image",
-        });
+        return next(new ErrorHandler("Failed to upload image", 500));
       }
     } else {
-      await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        error: "Event image is required",
-      });
+      return next(new ErrorHandler("Event image is required", 400));
     }
 
     // Create event
-    const event = await Event.create(
-      {
-        name,
-        description: description || "",
-        date,
-        time,
-        image: imageUrl,
-        location,
-        link,
-      },
-      { transaction }
-    );
-
-    await transaction.commit();
+    const event = await eventRepository.create({
+      name,
+      description: description || "",
+      date,
+      time,
+      image: imageUrl,
+      location,
+      link,
+    });
 
     return res.status(201).json({
       success: true,
       data: event,
     });
   } catch (error) {
-    await transaction.rollback();
     console.error("Error in createEvent:", error);
 
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map((err) => err.message);
-      return res.status(400).json({
-        success: false,
-        error: messages,
-      });
+      return next(new ErrorHandler(messages, 400));
     }
 
-    return res.status(500).json({
-      success: false,
-      error: "Server Error",
-    });
+    return next(new ErrorHandler("Server Error", 500));
   }
-};
+});
 
 // Update event
-const updateEvent = async (req, res) => {
-  const transaction = await sequelize.transaction();
-
+exports.updateEvent = catchAsyncErrors(async (req, res, next) => {
   try {
     // Find the event
-    const event = await Event.findByPk(req.params.id, { transaction });
+    const event = await eventRepository.findById(req.params.id);
 
     if (!event) {
-      await transaction.rollback();
-      return res.status(404).json({
-        success: false,
-        error: "Event not found",
-      });
+      return next(new ErrorHandler("Event not found", 404));
     }
 
     // Update fields
     const { name, description, date, time, location, link } = req.body;
 
-    if (name) event.name = name;
-    if (description !== undefined) event.description = description;
-    if (date) event.date = date;
-    if (time) event.time = time;
-    if (location) event.location = location;
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (date) updateData.date = date;
+    if (time) updateData.time = time;
+    if (location) updateData.location = location;
 
     // Validate link format if provided
     if (link) {
       const urlPattern = /^https?:\/\/.+/;
       if (!urlPattern.test(link)) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          error: "Link must be a valid URL starting with http:// or https://",
-        });
+        return next(
+          new ErrorHandler(
+            "Link must be a valid URL starting with http:// or https://",
+            400
+          )
+        );
       }
-      event.link = link;
+      updateData.link = link;
     }
 
     // Handle image update if provided
@@ -203,93 +171,61 @@ const updateEvent = async (req, res) => {
         "image/gif",
       ];
       if (!allowedTypes.includes(imageFile.mimetype)) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          error: "Invalid image type. Allowed types: JPEG, PNG, JPG, GIF",
-        });
+        return next(
+          new ErrorHandler(
+            "Invalid image type. Allowed types: JPEG, PNG, JPG, GIF",
+            400
+          )
+        );
       }
 
       // Upload to S3
       try {
         const uploadResult = await uploadFileToS3(imageFile, "events");
-        event.image = uploadResult.url;
+        updateData.image = uploadResult.url;
       } catch (uploadError) {
-        await transaction.rollback();
         console.error("Error uploading image:", uploadError);
-        return res.status(500).json({
-          success: false,
-          error: "Failed to upload image",
-        });
+        return next(new ErrorHandler("Failed to upload image", 500));
       }
     }
 
-    await event.save({ transaction });
-    await transaction.commit();
+    // Update the event
+    const updatedEvent = await eventRepository.update(event.id, updateData);
 
     return res.status(200).json({
       success: true,
-      data: event,
+      data: updatedEvent,
     });
   } catch (error) {
-    await transaction.rollback();
     console.error("Error in updateEvent:", error);
 
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map((err) => err.message);
-      return res.status(400).json({
-        success: false,
-        error: messages,
-      });
+      return next(new ErrorHandler(messages, 400));
     }
 
-    return res.status(500).json({
-      success: false,
-      error: "Server Error",
-    });
+    return next(new ErrorHandler("Server Error", 500));
   }
-};
+});
 
 // Delete event
-const deleteEvent = async (req, res) => {
-  const transaction = await sequelize.transaction();
-
+exports.deleteEvent = catchAsyncErrors(async (req, res, next) => {
   try {
-    const event = await Event.findByPk(req.params.id, { transaction });
+    const event = await eventRepository.findById(req.params.id);
 
     if (!event) {
-      await transaction.rollback();
-      return res.status(404).json({
-        success: false,
-        error: "Event not found",
-      });
+      return next(new ErrorHandler("Event not found", 404));
     }
 
-    // Delete image from S3 if needed
-    // This would require tracking the S3 key, not just the URL
-    // You could implement a separate field for the S3 key in your Event model
-
-    await event.destroy({ transaction });
-    await transaction.commit();
+    // Delete the event
+    await eventRepository.delete(event.id);
 
     return res.status(200).json({
       success: true,
       data: {},
     });
   } catch (error) {
-    await transaction.rollback();
     console.error("Error in deleteEvent:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Server Error",
-    });
+    return next(new ErrorHandler("Server Error", 500));
   }
-};
-
-module.exports = {
-  getAllEvents,
-  getEventById,
-  createEvent,
-  updateEvent,
-  deleteEvent,
-};
+});

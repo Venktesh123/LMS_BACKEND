@@ -1,5 +1,6 @@
+// controllers/authController.js
 const jwt = require("jsonwebtoken");
-const { User, Teacher, Student } = require("../models");
+const { User, Teacher, Student, sequelize } = require("../models");
 const config = require("../config/config");
 
 // Register new user
@@ -60,9 +61,13 @@ const register = async (req, res) => {
     });
 
     // Generate JWT token
-    const token = jwt.sign({ id: result.id }, config.jwt.secret, {
-      expiresIn: config.jwt.expiresIn,
-    });
+    const token = jwt.sign(
+      { id: result.id },
+      process.env.JWT_SECRET || config.jwt.secret,
+      {
+        expiresIn: config.jwt.expiresIn,
+      }
+    );
 
     return res.status(201).json({
       user: {
@@ -92,16 +97,20 @@ const login = async (req, res) => {
     }
 
     // Validate password
-    const isPasswordValid = await user.validatePassword(password);
+    const isPasswordValid = await user.comparePassword(password);
 
     if (!isPasswordValid) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     // Generate JWT token
-    const token = jwt.sign({ id: user.id }, config.jwt.secret, {
-      expiresIn: config.jwt.expiresIn,
-    });
+    const token = jwt.sign(
+      { id: user.id },
+      process.env.JWT_SECRET || config.jwt.secret,
+      {
+        expiresIn: config.jwt.expiresIn,
+      }
+    );
 
     return res.json({
       user: {
@@ -118,7 +127,63 @@ const login = async (req, res) => {
   }
 };
 
+// Get current authenticated user
+const getCurrentUser = async (req, res) => {
+  try {
+    // User should be available from the auth middleware
+    const userId = req.user.id;
+
+    // Fetch the user with appropriate profile details
+    const user = await User.findByPk(userId, {
+      attributes: { exclude: ["password"] },
+      include: [
+        // Include teacher details if user is a teacher
+        {
+          model: Teacher,
+          as: "teacher",
+          required: false,
+        },
+        // Include student details if user is a student
+        {
+          model: Student,
+          as: "student",
+          required: false,
+          include: [
+            {
+              model: Teacher,
+              as: "teacher",
+              include: [{ model: User, attributes: ["name", "email"] }],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Return the user details
+    return res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        // Include relevant profile data based on role
+        ...(user.teacher ? { teacher: user.teacher } : {}),
+        ...(user.student ? { student: user.student } : {}),
+      },
+    });
+  } catch (error) {
+    console.error("Get current user error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   register,
   login,
+  getCurrentUser,
 };

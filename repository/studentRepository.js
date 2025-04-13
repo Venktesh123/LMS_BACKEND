@@ -1,9 +1,17 @@
-const { Student, User, Teacher, Course, Submission } = require("../models");
+// repository/studentRepository.js
+const {
+  Student,
+  User,
+  Teacher,
+  Course,
+  Assignment,
+  Submission,
+} = require("../models");
 const { Op } = require("sequelize");
 
 class StudentRepository {
-  async create(studentData) {
-    return await Student.create(studentData);
+  async create(studentData, options = {}) {
+    return await Student.create(studentData, options);
   }
 
   async findById(id) {

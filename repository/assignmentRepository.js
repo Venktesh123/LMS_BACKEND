@@ -1,4 +1,5 @@
-const { Assignment, Course, Student, Submission } = require("../models");
+// repository/assignmentRepository.js
+const { Assignment, Course, Student, User, Submission } = require("../models");
 const { Op } = require("sequelize");
 
 class AssignmentRepository {

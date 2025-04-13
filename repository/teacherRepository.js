@@ -1,9 +1,10 @@
+// repository/teacherRepository.js
 const { Teacher, User, Student, Course } = require("../models");
 const { Op } = require("sequelize");
 
 class TeacherRepository {
-  async create(teacherData) {
-    return await Teacher.create(teacherData);
+  async create(teacherData, options = {}) {
+    return await Teacher.create(teacherData, options);
   }
 
   async findById(id) {
@@ -21,7 +22,7 @@ class TeacherRepository {
 
   async findByEmail(email) {
     return await Teacher.findOne({
-      where: { email },
+      where: { email: email.toLowerCase() },
       include: [{ model: User, as: "user" }],
     });
   }

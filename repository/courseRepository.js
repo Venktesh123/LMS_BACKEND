@@ -1,10 +1,18 @@
+// repository/courseRepository.js
 const {
   Course,
   Teacher,
+  User,
   Semester,
   Student,
   Lecture,
   Assignment,
+  CourseOutcome,
+  CourseSchedule,
+  CourseSyllabus,
+  WeeklyPlan,
+  CreditPoints,
+  CourseAttendance,
 } = require("../models");
 const { Op } = require("sequelize");
 
@@ -72,7 +80,6 @@ class CourseRepository {
 
   // Course component methods
   async createCourseOutcome(courseId, outcomesData) {
-    const { CourseOutcome } = require("../models");
     return await CourseOutcome.create({
       courseId,
       outcomes: outcomesData,
@@ -80,7 +87,6 @@ class CourseRepository {
   }
 
   async createCourseSchedule(courseId, scheduleData) {
-    const { CourseSchedule } = require("../models");
     return await CourseSchedule.create({
       courseId,
       ...scheduleData,
@@ -88,7 +94,6 @@ class CourseRepository {
   }
 
   async createCourseSyllabus(courseId, modulesData) {
-    const { CourseSyllabus } = require("../models");
     return await CourseSyllabus.create({
       courseId,
       modules: modulesData,
@@ -96,7 +101,6 @@ class CourseRepository {
   }
 
   async createWeeklyPlan(courseId, weeksData) {
-    const { WeeklyPlan } = require("../models");
     return await WeeklyPlan.create({
       courseId,
       weeks: weeksData,
@@ -104,7 +108,6 @@ class CourseRepository {
   }
 
   async createCreditPoints(courseId, creditPointsData) {
-    const { CreditPoints } = require("../models");
     return await CreditPoints.create({
       courseId,
       ...creditPointsData,
@@ -112,7 +115,6 @@ class CourseRepository {
   }
 
   async createCourseAttendance(courseId, sessionsData) {
-    const { CourseAttendance } = require("../models");
     return await CourseAttendance.create({
       courseId,
       sessions: sessionsData,
@@ -134,3 +136,5 @@ class CourseRepository {
     return course ? course.students : [];
   }
 }
+
+module.exports = new CourseRepository();

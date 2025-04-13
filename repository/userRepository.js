@@ -1,9 +1,10 @@
+// repository/userRepository.js
 const { User, Teacher, Student } = require("../models");
 const { Op } = require("sequelize");
 
 class UserRepository {
-  async create(userData) {
-    return await User.create(userData);
+  async create(userData, options = {}) {
+    return await User.create(userData, options);
   }
 
   async findById(id) {
