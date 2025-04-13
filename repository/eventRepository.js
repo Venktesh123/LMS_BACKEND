@@ -36,3 +36,5 @@ class EventRepository {
     return true;
   }
 }
+
+module.exports = new EventRepository();

@@ -7,14 +7,6 @@ const { checkRole } = require("../middleware/roleCheck");
 // Get all lectures for a course
 router.get("/:courseId/lectures", auth, lectureController.getCourseLectures);
 
-// Get student view of course lectures
-router.get(
-  "/student/:courseId/lectures",
-  auth,
-  checkRole(["student"]),
-  lectureController.getCourseLecturesByStudents
-);
-
 // Get specific lecture
 router.get(
   "/:courseId/lectures/:lectureId",
@@ -46,20 +38,12 @@ router.delete(
   lectureController.deleteLecture
 );
 
-// Update lecture review status (teacher only)
+// Toggle lecture review status (teacher only)
 router.put(
   "/:courseId/lectures/:lectureId/review",
   auth,
   checkRole(["teacher"]),
-  lectureController.updateLectureReviewStatus
-);
-
-// Update all expired lecture review statuses (teacher only)
-router.put(
-  "/:courseId/lectures/review-all",
-  auth,
-  checkRole(["teacher"]),
-  lectureController.updateAllLectureReviewStatuses
+  lectureController.toggleLectureReview
 );
 
 module.exports = router;
