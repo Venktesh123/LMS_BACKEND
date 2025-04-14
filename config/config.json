@@ -1,9 +1,9 @@
 {
   "development": {
-    "username": "${process.env.DB_USERNAME || 'postgres'}",
-    "password": "${process.env.DB_PASSWORD || 'your_password'}",
-    "database": "${process.env.DB_NAME || 'lms_development'}",
-    "host": "${process.env.DB_HOST || '127.0.0.1'}",
+    "username": "postgres",
+    "password": "Venk830#",
+    "database": "LMS",
+    "host": "127.0.0.1",
     "dialect": "postgres",
     "logging": true,
     "define": {
@@ -18,10 +18,10 @@
     }
   },
   "test": {
-    "username": "${process.env.DB_USERNAME || 'postgres'}",
-    "password": "${process.env.DB_PASSWORD || 'your_password'}",
-    "database": "${process.env.DB_TEST_NAME || 'lms_test'}",
-    "host": "${process.env.DB_HOST || '127.0.0.1'}",
+    "username": "postgres",
+    "password": "Venk830#",
+    "database": "lms_test",
+    "host": "127.0.0.1",
     "dialect": "postgres",
     "logging": false,
     "define": {
@@ -30,10 +30,10 @@
     }
   },
   "production": {
-    "username": "${process.env.DB_USERNAME}",
-    "password": "${process.env.DB_PASSWORD}",
-    "database": "${process.env.DB_NAME || 'lms_production'}",
-    "host": "${process.env.DB_HOST}",
+    "username": "postgres",
+    "password": "your_production_password",
+    "database": "lms_production",
+    "host": "your_production_host",
     "dialect": "postgres",
     "logging": false,
     "dialectOptions": {
@@ -54,14 +54,14 @@
     }
   },
   "jwt": {
-    "secret": "${process.env.JWT_SECRET || 'your_jwt_secret_key_should_be_complex_and_unique'}",
-    "expiresIn": "${process.env.JWT_EXPIRES_IN || '7d'}"
+    "secret": "your_jwt_secret_key_should_be_complex_and_unique",
+    "expiresIn": "7d"
   },
   "aws": {
-    "accessKeyId": "${process.env.AWS_ACCESS_KEY_ID}",
-    "secretAccessKey": "${process.env.AWS_SECRET_ACCESS_KEY}",
-    "region": "${process.env.AWS_REGION || 'us-east-1'}",
-    "bucketName": "${process.env.AWS_S3_BUCKET_NAME}"
+    "accessKeyId": "your_aws_access_key_id",
+    "secretAccessKey": "your_aws_secret_access_key",
+    "region": "us-east-1",
+    "bucketName": "your_s3_bucket_name"
   },
   "fileUpload": {
     "allowedTypes": [
