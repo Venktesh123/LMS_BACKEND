@@ -13,8 +13,9 @@ module.exports = (sequelize) => {
         as: "semester",
       });
 
+      // Updated: Use Enrollments instead of StudentCourses
       Course.belongsToMany(models.Student, {
-        through: "StudentCourses",
+        through: "Enrollments",
         foreignKey: "courseId",
         otherKey: "studentId",
         as: "students",
