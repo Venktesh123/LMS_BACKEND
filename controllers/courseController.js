@@ -23,6 +23,12 @@ const Semester = db.Semester;
 const Lecture = db.Lecture;
 const Assignment = db.Assignment;
 const Enrollment = db.Enrollment;
+const CourseOutcome = db.CourseOutcome;
+const CourseSchedule = db.CourseSchedule;
+const CourseSyllabus = db.CourseSyllabus;
+const WeeklyPlan = db.WeeklyPlan;
+const CreditPoints = db.CreditPoints;
+const CourseAttendance = db.CourseAttendance;
 
 // Helper function to format course data
 const formatCourseData = (course) => {
@@ -73,6 +79,36 @@ const formatCourseData = (course) => {
     }));
   }
 
+  // Format learning outcomes
+  let learningOutcomes = [];
+  if (course.outcomes && course.outcomes.outcomes) {
+    learningOutcomes = course.outcomes.outcomes;
+  }
+
+  // Format syllabus
+  let syllabus = [];
+  if (course.syllabus && course.syllabus.modules) {
+    syllabus = course.syllabus.modules;
+  }
+
+  // Format weekly plan
+  let weeklyPlan = [];
+  if (course.weeklyPlan && course.weeklyPlan.weeks) {
+    weeklyPlan = course.weeklyPlan.weeks;
+  }
+
+  // Format schedule
+  let courseSchedule = null;
+  if (course.schedule) {
+    courseSchedule = {
+      classStartDate: course.schedule.classStartDate,
+      classEndDate: course.schedule.classEndDate,
+      midSemesterExamDate: course.schedule.midSemesterExamDate,
+      endSemesterExamDate: course.schedule.endSemesterExamDate,
+      classDaysAndTimes: course.schedule.classDaysAndTimes,
+    };
+  }
+
   return {
     id: course.id,
     title: course.title,
@@ -87,29 +123,10 @@ const formatCourseData = (course) => {
       : null,
     teacher: course.teacher,
     creditPoints: creditPoints,
-    learningOutcomes: course.outcomes ? course.outcomes.outcomes : [],
-    weeklyPlan: course.weeklyPlan
-      ? course.weeklyPlan.weeks.map((week) => ({
-          weekNumber: week.weekNumber,
-          topics: week.topics,
-        }))
-      : [],
-    syllabus: course.syllabus
-      ? course.syllabus.modules.map((module) => ({
-          moduleNumber: module.moduleNumber,
-          moduleTitle: module.moduleTitle,
-          topics: module.topics,
-        }))
-      : [],
-    courseSchedule: course.schedule
-      ? {
-          classStartDate: course.schedule.classStartDate,
-          classEndDate: course.schedule.classEndDate,
-          midSemesterExamDate: course.schedule.midSemesterExamDate,
-          endSemesterExamDate: course.schedule.endSemesterExamDate,
-          classDaysAndTimes: course.schedule.classDaysAndTimes,
-        }
-      : null,
+    learningOutcomes: learningOutcomes,
+    weeklyPlan: weeklyPlan,
+    syllabus: syllabus,
+    courseSchedule: courseSchedule,
     lectures: lectures,
     assignments: assignments,
     attendance: course.attendance ? course.attendance.sessions : {},
@@ -303,6 +320,12 @@ const getCourseById = catchAsyncErrors(async (req, res, next) => {
         },
         { model: Lecture, as: "lectures" },
         { model: Assignment, as: "assignments" },
+        { model: CourseOutcome, as: "outcomes" },
+        { model: CourseSchedule, as: "schedule" },
+        { model: CourseSyllabus, as: "syllabus" },
+        { model: WeeklyPlan, as: "weeklyPlan" },
+        { model: CreditPoints, as: "creditPoints" },
+        { model: CourseAttendance, as: "attendance" },
       ],
     });
 
@@ -430,6 +453,7 @@ const createCourse = catchAsyncErrors(async (req, res, next) => {
 
   try {
     logger.info("Starting createCourse controller function");
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
 
     transaction = await sequelize.transaction();
 
@@ -467,84 +491,114 @@ const createCourse = catchAsyncErrors(async (req, res, next) => {
     // If learning outcomes are provided, create them
     if (req.body.learningOutcomes && req.body.learningOutcomes.length > 0) {
       logger.info("Creating learning outcomes");
-      await courseRepository.createCourseOutcome(
-        course.id,
-        req.body.learningOutcomes,
-        transaction
+      console.log(
+        "Learning outcomes data:",
+        JSON.stringify(req.body.learningOutcomes, null, 2)
       );
+      try {
+        await courseRepository.createCourseOutcome(
+          course.id,
+          req.body.learningOutcomes,
+          transaction
+        );
+        console.log("Learning outcomes created successfully");
+      } catch (error) {
+        console.error("Error creating learning outcomes:", error);
+        throw error; // Rethrow to trigger transaction rollback
+      }
     }
 
     // If course schedule is provided, create it
     if (req.body.courseSchedule) {
       logger.info("Creating course schedule");
-      await courseRepository.createCourseSchedule(
-        course.id,
-        req.body.courseSchedule,
-        transaction
+      console.log(
+        "Course schedule data:",
+        JSON.stringify(req.body.courseSchedule, null, 2)
       );
+      try {
+        await courseRepository.createCourseSchedule(
+          course.id,
+          req.body.courseSchedule,
+          transaction
+        );
+        console.log("Course schedule created successfully");
+      } catch (error) {
+        console.error("Error creating course schedule:", error);
+        throw error; // Rethrow to trigger transaction rollback
+      }
     }
 
     // If syllabus is provided, create it
     if (req.body.syllabus && req.body.syllabus.length > 0) {
       logger.info("Creating course syllabus");
-      await courseRepository.createCourseSyllabus(
-        course.id,
-        req.body.syllabus,
-        transaction
-      );
+      console.log("Syllabus data:", JSON.stringify(req.body.syllabus, null, 2));
+      try {
+        await courseRepository.createCourseSyllabus(
+          course.id,
+          req.body.syllabus,
+          transaction
+        );
+        console.log("Course syllabus created successfully");
+      } catch (error) {
+        console.error("Error creating course syllabus:", error);
+        throw error; // Rethrow to trigger transaction rollback
+      }
     }
 
     // If weekly plan is provided, create it
     if (req.body.weeklyPlan && req.body.weeklyPlan.length > 0) {
       logger.info("Creating weekly plan");
-      await courseRepository.createWeeklyPlan(
-        course.id,
-        req.body.weeklyPlan,
-        transaction
+      console.log(
+        "Weekly plan data:",
+        JSON.stringify(req.body.weeklyPlan, null, 2)
       );
+      try {
+        await courseRepository.createWeeklyPlan(
+          course.id,
+          req.body.weeklyPlan,
+          transaction
+        );
+        console.log("Weekly plan created successfully");
+      } catch (error) {
+        console.error("Error creating weekly plan:", error);
+        throw error; // Rethrow to trigger transaction rollback
+      }
     }
 
     // If credit points are provided, create them
     if (req.body.creditPoints) {
       logger.info("Creating credit points");
-      await courseRepository.createCreditPoints(
-        course.id,
-        req.body.creditPoints,
-        transaction
+      console.log(
+        "Credit points data:",
+        JSON.stringify(req.body.creditPoints, null, 2)
       );
+      try {
+        await courseRepository.createCreditPoints(
+          course.id,
+          req.body.creditPoints,
+          transaction
+        );
+        console.log("Credit points created successfully");
+      } catch (error) {
+        console.error("Error creating credit points:", error);
+        throw error; // Rethrow to trigger transaction rollback
+      }
     }
 
     // If attendance is provided, create it
     if (req.body.attendance && req.body.attendance.sessions) {
       logger.info("Creating course attendance");
-      await courseRepository.createCourseAttendance(
-        course.id,
-        req.body.attendance.sessions,
-        transaction
-      );
-    }
-
-    // If lectures are provided in the request, create them
-    if (req.body.lectures && Array.isArray(req.body.lectures)) {
-      logger.info("Creating lectures for the course");
-      const lecturePromises = req.body.lectures.map((lectureData) => {
-        return Lecture.create(
-          {
-            title: lectureData.title,
-            content: lectureData.content || lectureData.title,
-            videoUrl: lectureData.videoUrl || null,
-            courseId: course.id,
-            isReviewed: lectureData.isReviewed || false,
-            reviewDeadline:
-              lectureData.reviewDeadline ||
-              new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          },
-          { transaction }
+      try {
+        await courseRepository.createCourseAttendance(
+          course.id,
+          req.body.attendance.sessions,
+          transaction
         );
-      });
-
-      await Promise.all(lecturePromises);
-      logger.info(`Created lectures for the course`);
+        console.log("Course attendance created successfully");
+      } catch (error) {
+        console.error("Error creating attendance:", error);
+        throw error; // Rethrow to trigger transaction rollback
+      }
     }
 
     // Get students assigned to this teacher and enroll them in the course
@@ -580,6 +634,12 @@ const createCourse = catchAsyncErrors(async (req, res, next) => {
           as: "teacher",
           include: [{ model: User, attributes: ["name", "email"], as: "user" }],
         },
+        { model: CourseOutcome, as: "outcomes" },
+        { model: CourseSchedule, as: "schedule" },
+        { model: CourseSyllabus, as: "syllabus" },
+        { model: WeeklyPlan, as: "weeklyPlan" },
+        { model: CreditPoints, as: "creditPoints" },
+        { model: CourseAttendance, as: "attendance" },
       ],
     });
 
@@ -650,43 +710,112 @@ const updateCourse = catchAsyncErrors(async (req, res, next) => {
     // Update learning outcomes if provided
     if (req.body.learningOutcomes) {
       logger.info("Updating learning outcomes");
-      // This would need a method in your repository to update outcomes
-      // await courseRepository.updateCourseOutcome(course.id, req.body.learningOutcomes, transaction);
+      console.log(
+        "Learning outcomes data:",
+        JSON.stringify(req.body.learningOutcomes, null, 2)
+      );
+      try {
+        await courseRepository.updateCourseOutcome(
+          course.id,
+          req.body.learningOutcomes,
+          transaction
+        );
+      } catch (error) {
+        console.error("Error updating learning outcomes:", error);
+        throw error;
+      }
     }
 
     // Update course schedule if provided
     if (req.body.courseSchedule) {
       logger.info("Updating course schedule");
-      // This would need a method in your repository to update schedule
-      // await courseRepository.updateCourseSchedule(course.id, req.body.courseSchedule, transaction);
+      console.log(
+        "Course schedule data:",
+        JSON.stringify(req.body.courseSchedule, null, 2)
+      );
+      try {
+        await courseRepository.updateCourseSchedule(
+          course.id,
+          req.body.courseSchedule,
+          transaction
+        );
+      } catch (error) {
+        console.error("Error updating course schedule:", error);
+        throw error;
+      }
     }
 
     // Update syllabus if provided
     if (req.body.syllabus) {
       logger.info("Updating syllabus");
-      // This would need a method in your repository to update syllabus
-      // await courseRepository.updateCourseSyllabus(course.id, req.body.syllabus, transaction);
+      console.log("Syllabus data:", JSON.stringify(req.body.syllabus, null, 2));
+      try {
+        await courseRepository.updateCourseSyllabus(
+          course.id,
+          req.body.syllabus,
+          transaction
+        );
+      } catch (error) {
+        console.error("Error updating syllabus:", error);
+        throw error;
+      }
     }
 
     // Update weekly plan if provided
     if (req.body.weeklyPlan) {
       logger.info("Updating weekly plan");
-      // This would need a method in your repository to update weekly plan
-      // await courseRepository.updateWeeklyPlan(course.id, req.body.weeklyPlan, transaction);
+      console.log(
+        "Weekly plan data:",
+        JSON.stringify(req.body.weeklyPlan, null, 2)
+      );
+      try {
+        await courseRepository.updateWeeklyPlan(
+          course.id,
+          req.body.weeklyPlan,
+          transaction
+        );
+      } catch (error) {
+        console.error("Error updating weekly plan:", error);
+        throw error;
+      }
     }
 
     // Update credit points if provided
     if (req.body.creditPoints) {
       logger.info("Updating credit points");
-      // This would need a method in your repository to update credit points
-      // await courseRepository.updateCreditPoints(course.id, req.body.creditPoints, transaction);
+      console.log(
+        "Credit points data:",
+        JSON.stringify(req.body.creditPoints, null, 2)
+      );
+      try {
+        await courseRepository.updateCreditPoints(
+          course.id,
+          req.body.creditPoints,
+          transaction
+        );
+      } catch (error) {
+        console.error("Error updating credit points:", error);
+        throw error;
+      }
     }
 
     // Update attendance if provided
     if (req.body.attendance && req.body.attendance.sessions) {
       logger.info("Updating attendance");
-      // This would need a method in your repository to update attendance
-      // await courseRepository.updateCourseAttendance(course.id, req.body.attendance.sessions, transaction);
+      console.log(
+        "Attendance data:",
+        JSON.stringify(req.body.attendance, null, 2)
+      );
+      try {
+        await courseRepository.updateCourseAttendance(
+          course.id,
+          req.body.attendance.sessions,
+          transaction
+        );
+      } catch (error) {
+        console.error("Error updating attendance:", error);
+        throw error;
+      }
     }
 
     await transaction.commit();
@@ -703,6 +832,12 @@ const updateCourse = catchAsyncErrors(async (req, res, next) => {
           as: "teacher",
           include: [{ model: User, attributes: ["name", "email"], as: "user" }],
         },
+        { model: CourseOutcome, as: "outcomes" },
+        { model: CourseSchedule, as: "schedule" },
+        { model: CourseSyllabus, as: "syllabus" },
+        { model: WeeklyPlan, as: "weeklyPlan" },
+        { model: CreditPoints, as: "creditPoints" },
+        { model: CourseAttendance, as: "attendance" },
       ],
     });
 
@@ -849,6 +984,50 @@ const deleteCourse = catchAsyncErrors(async (req, res, next) => {
       transaction,
     });
     logger.info("Deleted all course assignments and submissions");
+
+    // Delete course components
+    try {
+      // Delete course outcomes
+      await CourseOutcome.destroy({
+        where: { courseId },
+        transaction,
+      });
+
+      // Delete course schedule
+      await CourseSchedule.destroy({
+        where: { courseId },
+        transaction,
+      });
+
+      // Delete course syllabus
+      await CourseSyllabus.destroy({
+        where: { courseId },
+        transaction,
+      });
+
+      // Delete weekly plan
+      await WeeklyPlan.destroy({
+        where: { courseId },
+        transaction,
+      });
+
+      // Delete credit points
+      await CreditPoints.destroy({
+        where: { courseId },
+        transaction,
+      });
+
+      // Delete course attendance
+      await CourseAttendance.destroy({
+        where: { courseId },
+        transaction,
+      });
+
+      logger.info("Deleted all course components");
+    } catch (error) {
+      logger.error("Error deleting course components:", error);
+      // Continue with course deletion even if component deletion fails
+    }
 
     // Delete the course
     await courseRepository.delete(course.id);
