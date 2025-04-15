@@ -6,21 +6,23 @@ const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 const { ErrorHandler } = require("../middleware/errorHandler");
 const { sequelize } = require("../config/database");
 const { uploadFileToS3, deleteFileFromS3 } = require("../utils/s3Helper");
-const {
-  User,
-  Course,
-  Teacher,
-  Student,
-  Semester,
-  Lecture,
-  Assignment,
-} = require("../models");
+const db = require("../models");
 
 // Better logging setup - replace with your preferred logging library
 const logger = {
   info: (message) => console.log(`[INFO] ${message}`),
   error: (message, error) => console.error(`[ERROR] ${message}`, error),
 };
+
+// Ensure all models are properly referenced
+const User = db.User;
+const Course = db.Course;
+const Teacher = db.Teacher;
+const Student = db.Student;
+const Semester = db.Semester;
+const Lecture = db.Lecture;
+const Assignment = db.Assignment;
+const Enrollment = db.Enrollment;
 
 // Helper function to format course data
 const formatCourseData = (course) => {
@@ -75,12 +77,12 @@ const formatCourseData = (course) => {
     id: course.id,
     title: course.title,
     aboutCourse: course.aboutCourse,
-    semester: course.Semester
+    semester: course.semester
       ? {
-          id: course.Semester.id,
-          name: course.Semester.name,
-          startDate: course.Semester.startDate,
-          endDate: course.Semester.endDate,
+          id: course.semester.id,
+          name: course.semester.name,
+          startDate: course.semester.startDate,
+          endDate: course.semester.endDate,
         }
       : null,
     teacher: course.teacher,
@@ -152,12 +154,12 @@ const getUserCourses = catchAsyncErrors(async (req, res, next) => {
           id: course.id,
           title: course.title,
           aboutCourse: course.aboutCourse,
-          semester: course.Semester
+          semester: course.semester
             ? {
-                id: course.Semester.id,
-                name: course.Semester.name,
-                startDate: course.Semester.startDate,
-                endDate: course.Semester.endDate,
+                id: course.semester.id,
+                name: course.semester.name,
+                startDate: course.semester.startDate,
+                endDate: course.semester.endDate,
               }
             : null,
         })),
@@ -188,12 +190,12 @@ const getUserCourses = catchAsyncErrors(async (req, res, next) => {
           id: course.id,
           title: course.title,
           aboutCourse: course.aboutCourse,
-          semester: course.Semester
+          semester: course.semester
             ? {
-                id: course.Semester.id,
-                name: course.Semester.name,
-                startDate: course.Semester.startDate,
-                endDate: course.Semester.endDate,
+                id: course.semester.id,
+                name: course.semester.name,
+                startDate: course.semester.startDate,
+                endDate: course.semester.endDate,
               }
             : null,
         })),
@@ -264,12 +266,12 @@ const getEnrolledCourses = catchAsyncErrors(async (req, res, next) => {
         id: course.id,
         title: course.title,
         aboutCourse: course.aboutCourse,
-        semester: course.Semester
+        semester: course.semester
           ? {
-              id: course.Semester.id,
-              name: course.Semester.name,
-              startDate: course.Semester.startDate,
-              endDate: course.Semester.endDate,
+              id: course.semester.id,
+              name: course.semester.name,
+              startDate: course.semester.startDate,
+              endDate: course.semester.endDate,
             }
           : null,
       })),
@@ -293,13 +295,14 @@ const getCourseById = catchAsyncErrors(async (req, res, next) => {
     // Find the course with its relationships
     const course = await courseRepository.findById(courseId, {
       include: [
-        { model: Semester },
+        { model: Semester, as: "semester" },
         {
           model: Teacher,
-          include: [{ model: User, attributes: ["name", "email"] }],
+          as: "teacher",
+          include: [{ model: User, attributes: ["name", "email"], as: "user" }],
         },
-        { model: Lecture },
-        { model: Assignment },
+        { model: Lecture, as: "lectures" },
+        { model: Assignment, as: "assignments" },
       ],
     });
 
@@ -340,7 +343,7 @@ const getCourseById = catchAsyncErrors(async (req, res, next) => {
 
       if (student) {
         // Check if student is enrolled in this course
-        const enrollments = await sequelize.models.Enrollment.findOne({
+        const enrollments = await Enrollment.findOne({
           where: {
             studentId: student.id,
             courseId: course.id,
@@ -422,15 +425,13 @@ const getCourseById = catchAsyncErrors(async (req, res, next) => {
 });
 
 // Create a new course
-// Fixed createCourse function in controllers/courseController.js
-// Fixed createCourse function in controllers/courseController.js
-// Fixed createCourse function with proper Enrollment handling
-// Fixed createCourse function with proper Enrollment handling
 const createCourse = catchAsyncErrors(async (req, res, next) => {
-  const transaction = await sequelize.transaction();
+  let transaction = null;
 
   try {
     logger.info("Starting createCourse controller function");
+
+    transaction = await sequelize.transaction();
 
     const { title, aboutCourse, semesterId } = req.body;
     const userId = req.user.id;
@@ -439,17 +440,15 @@ const createCourse = catchAsyncErrors(async (req, res, next) => {
     const teacher = await teacherRepository.findByUserId(userId);
 
     if (!teacher) {
-      await transaction.rollback();
       logger.error(`Teacher not found for user ID: ${userId}`);
-      return next(new ErrorHandler("Teacher profile not found", 404));
+      throw new ErrorHandler("Teacher profile not found", 404);
     }
 
     // Find the semester
     const semester = await Semester.findByPk(semesterId, { transaction });
     if (!semester) {
-      await transaction.rollback();
       logger.error(`Semester not found with ID: ${semesterId}`);
-      return next(new ErrorHandler("Semester not found", 404));
+      throw new ErrorHandler("Semester not found", 404);
     }
 
     // Create the course
@@ -554,36 +553,32 @@ const createCourse = catchAsyncErrors(async (req, res, next) => {
     if (students.length > 0) {
       logger.info("Enrolling students in the new course");
 
-      // Import the Enrollment model directly
-      const { Enrollment } = require("../models");
+      // Enrollment records to create
+      const enrollmentData = students.map((student) => ({
+        studentId: student.id,
+        courseId: course.id,
+        enrollmentDate: new Date(),
+        status: "active",
+      }));
 
-      const enrollmentPromises = students.map((student) => {
-        return Enrollment.create(
-          {
-            studentId: student.id,
-            courseId: course.id,
-            enrollmentDate: new Date(),
-            status: "active",
-          },
-          { transaction }
-        );
-      });
-
-      await Promise.all(enrollmentPromises);
+      // Bulk create enrollments
+      await Enrollment.bulkCreate(enrollmentData, { transaction });
       logger.info(`Enrolled ${students.length} students in the course`);
     }
 
     await transaction.commit();
+    transaction = null;
     logger.info("Transaction committed successfully");
 
     // Return the created course with its relationships
     const createdCourse = await courseRepository.findById(course.id, {
       include: [
-        { model: Semester },
-        { model: Lecture },
+        { model: Semester, as: "semester" },
+        { model: Lecture, as: "lectures" },
         {
           model: Teacher,
-          include: [{ model: User, attributes: ["name", "email"] }],
+          as: "teacher",
+          include: [{ model: User, attributes: ["name", "email"], as: "user" }],
         },
       ],
     });
@@ -593,18 +588,24 @@ const createCourse = catchAsyncErrors(async (req, res, next) => {
       course: formatCourseData(createdCourse),
     });
   } catch (error) {
-    await transaction.rollback();
+    if (transaction) {
+      await transaction.rollback();
+    }
     logger.error("Error in createCourse:", error);
-    return next(new ErrorHandler(error.message, 400));
+    return next(
+      error.statusCode ? error : new ErrorHandler(error.message, 400)
+    );
   }
 });
+
 // Update a course
 const updateCourse = catchAsyncErrors(async (req, res, next) => {
   let transaction = null;
 
   try {
-    transaction = await sequelize.transaction();
     logger.info(`Updating course ID: ${req.params.courseId}`);
+
+    transaction = await sequelize.transaction();
 
     const { courseId } = req.params;
     const { title, aboutCourse, semesterId } = req.body;
@@ -615,7 +616,7 @@ const updateCourse = catchAsyncErrors(async (req, res, next) => {
 
     if (!teacher) {
       logger.error(`Teacher not found for user ID: ${userId}`);
-      return next(new ErrorHandler("Teacher profile not found", 404));
+      throw new ErrorHandler("Teacher profile not found", 404);
     }
 
     // Find the course and check ownership
@@ -625,7 +626,7 @@ const updateCourse = catchAsyncErrors(async (req, res, next) => {
       logger.error(
         `Course not found or unauthorized for course ID: ${courseId}`
       );
-      return next(new ErrorHandler("Course not found or unauthorized", 404));
+      throw new ErrorHandler("Course not found or unauthorized", 404);
     }
 
     // Update course fields
@@ -637,7 +638,7 @@ const updateCourse = catchAsyncErrors(async (req, res, next) => {
     if (semesterId) {
       const semester = await Semester.findByPk(semesterId, { transaction });
       if (!semester) {
-        return next(new ErrorHandler("Semester not found", 404));
+        throw new ErrorHandler("Semester not found", 404);
       }
       updateData.semesterId = semesterId;
     }
@@ -650,55 +651,57 @@ const updateCourse = catchAsyncErrors(async (req, res, next) => {
     if (req.body.learningOutcomes) {
       logger.info("Updating learning outcomes");
       // This would need a method in your repository to update outcomes
-      // await courseRepository.updateCourseOutcome(course.id, req.body.learningOutcomes);
+      // await courseRepository.updateCourseOutcome(course.id, req.body.learningOutcomes, transaction);
     }
 
     // Update course schedule if provided
     if (req.body.courseSchedule) {
       logger.info("Updating course schedule");
       // This would need a method in your repository to update schedule
-      // await courseRepository.updateCourseSchedule(course.id, req.body.courseSchedule);
+      // await courseRepository.updateCourseSchedule(course.id, req.body.courseSchedule, transaction);
     }
 
     // Update syllabus if provided
     if (req.body.syllabus) {
       logger.info("Updating syllabus");
       // This would need a method in your repository to update syllabus
-      // await courseRepository.updateCourseSyllabus(course.id, req.body.syllabus);
+      // await courseRepository.updateCourseSyllabus(course.id, req.body.syllabus, transaction);
     }
 
     // Update weekly plan if provided
     if (req.body.weeklyPlan) {
       logger.info("Updating weekly plan");
       // This would need a method in your repository to update weekly plan
-      // await courseRepository.updateWeeklyPlan(course.id, req.body.weeklyPlan);
+      // await courseRepository.updateWeeklyPlan(course.id, req.body.weeklyPlan, transaction);
     }
 
     // Update credit points if provided
     if (req.body.creditPoints) {
       logger.info("Updating credit points");
       // This would need a method in your repository to update credit points
-      // await courseRepository.updateCreditPoints(course.id, req.body.creditPoints);
+      // await courseRepository.updateCreditPoints(course.id, req.body.creditPoints, transaction);
     }
 
     // Update attendance if provided
     if (req.body.attendance && req.body.attendance.sessions) {
       logger.info("Updating attendance");
       // This would need a method in your repository to update attendance
-      // await courseRepository.updateCourseAttendance(course.id, req.body.attendance.sessions);
+      // await courseRepository.updateCourseAttendance(course.id, req.body.attendance.sessions, transaction);
     }
 
     await transaction.commit();
+    transaction = null;
     logger.info("Transaction committed successfully");
 
     // Return the updated course with its relationships
     const updatedCourse = await courseRepository.findById(course.id, {
       include: [
-        { model: Semester },
-        { model: Lecture },
+        { model: Semester, as: "semester" },
+        { model: Lecture, as: "lectures" },
         {
           model: Teacher,
-          include: [{ model: User, attributes: ["name", "email"] }],
+          as: "teacher",
+          include: [{ model: User, attributes: ["name", "email"], as: "user" }],
         },
       ],
     });
@@ -708,16 +711,13 @@ const updateCourse = catchAsyncErrors(async (req, res, next) => {
       course: formatCourseData(updatedCourse),
     });
   } catch (error) {
-    if (transaction && !transaction.finished) {
-      try {
-        await transaction.rollback();
-        logger.info("Transaction rolled back due to error");
-      } catch (rollbackError) {
-        logger.error("Error during transaction rollback:", rollbackError);
-      }
+    if (transaction) {
+      await transaction.rollback();
     }
     logger.error("Error in updateCourse:", error);
-    return next(new ErrorHandler(error.message, 400));
+    return next(
+      error.statusCode ? error : new ErrorHandler(error.message, 400)
+    );
   }
 });
 
@@ -726,8 +726,9 @@ const deleteCourse = catchAsyncErrors(async (req, res, next) => {
   let transaction = null;
 
   try {
-    transaction = await sequelize.transaction();
     logger.info(`Deleting course ID: ${req.params.courseId}`);
+
+    transaction = await sequelize.transaction();
 
     const { courseId } = req.params;
     const userId = req.user.id;
@@ -737,7 +738,7 @@ const deleteCourse = catchAsyncErrors(async (req, res, next) => {
 
     if (!teacher) {
       logger.error(`Teacher not found for user ID: ${userId}`);
-      return next(new ErrorHandler("Teacher profile not found", 404));
+      throw new ErrorHandler("Teacher profile not found", 404);
     }
 
     // Find the course and check ownership
@@ -747,20 +748,15 @@ const deleteCourse = catchAsyncErrors(async (req, res, next) => {
       logger.error(
         `Course not found or unauthorized for course ID: ${courseId}`
       );
-      return next(new ErrorHandler("Course not found or unauthorized", 404));
+      throw new ErrorHandler("Course not found or unauthorized", 404);
     }
 
-    try {
-      // Delete all enrollments
-      await sequelize.models.Enrollment.destroy({
-        where: { courseId },
-        transaction,
-      });
-      logger.info("Deleted all course enrollments");
-    } catch (enrollmentError) {
-      logger.error("Error deleting enrollments:", enrollmentError);
-      // Continue with deletion even if enrollments fail to delete
-    }
+    // Delete all enrollments
+    await Enrollment.destroy({
+      where: { courseId },
+      transaction,
+    });
+    logger.info("Deleted all course enrollments");
 
     // Delete all lectures
     const lectures = await Lecture.findAll({
@@ -795,44 +791,36 @@ const deleteCourse = catchAsyncErrors(async (req, res, next) => {
 
     for (const assignment of assignments) {
       // Delete submission files from S3
-      try {
-        const submissions = await sequelize.models.Submission.findAll({
-          where: { assignmentId: assignment.id },
-          transaction,
-        });
+      const submissions = await sequelize.models.Submission.findAll({
+        where: { assignmentId: assignment.id },
+        transaction,
+      });
 
-        for (const submission of submissions) {
-          if (
-            submission.submissionFile &&
-            submission.submissionFile.includes("amazonaws.com")
-          ) {
-            try {
-              // Extract key from URL
-              const key = submission.submissionFile
-                .split("/")
-                .slice(3)
-                .join("/");
-              await deleteFileFromS3(key);
-              logger.info(`Deleted submission file from S3: ${key}`);
-            } catch (error) {
-              logger.error(
-                `Error deleting submission file: ${submission.submissionFile}`,
-                error
-              );
-              // Continue with deletion even if S3 delete fails
-            }
+      for (const submission of submissions) {
+        if (
+          submission.submissionFile &&
+          submission.submissionFile.includes("amazonaws.com")
+        ) {
+          try {
+            // Extract key from URL
+            const key = submission.submissionFile.split("/").slice(3).join("/");
+            await deleteFileFromS3(key);
+            logger.info(`Deleted submission file from S3: ${key}`);
+          } catch (error) {
+            logger.error(
+              `Error deleting submission file: ${submission.submissionFile}`,
+              error
+            );
+            // Continue with deletion even if S3 delete fails
           }
         }
-
-        // Delete submissions
-        await sequelize.models.Submission.destroy({
-          where: { assignmentId: assignment.id },
-          transaction,
-        });
-      } catch (submissionError) {
-        logger.error("Error deleting submissions:", submissionError);
-        // Continue with deletion even if submissions fail to delete
       }
+
+      // Delete submissions
+      await sequelize.models.Submission.destroy({
+        where: { assignmentId: assignment.id },
+        transaction,
+      });
 
       // Delete assignment attachments from S3
       if (assignment.attachments && assignment.attachments.length > 0) {
@@ -867,6 +855,7 @@ const deleteCourse = catchAsyncErrors(async (req, res, next) => {
     logger.info(`Deleted course: ${courseId}`);
 
     await transaction.commit();
+    transaction = null;
     logger.info("Transaction committed successfully");
 
     return res.json({
@@ -874,16 +863,13 @@ const deleteCourse = catchAsyncErrors(async (req, res, next) => {
       message: "Course deleted successfully",
     });
   } catch (error) {
-    if (transaction && !transaction.finished) {
-      try {
-        await transaction.rollback();
-        logger.info("Transaction rolled back due to error");
-      } catch (rollbackError) {
-        logger.error("Error during transaction rollback:", rollbackError);
-      }
+    if (transaction) {
+      await transaction.rollback();
     }
     logger.error("Error in deleteCourse:", error);
-    return next(new ErrorHandler(error.message, 400));
+    return next(
+      error.statusCode ? error : new ErrorHandler(error.message, 400)
+    );
   }
 });
 

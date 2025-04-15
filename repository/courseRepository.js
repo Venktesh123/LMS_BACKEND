@@ -1,4 +1,4 @@
-// Fixed repository/courseRepository.js
+// repository/courseRepository.js
 const {
   Course,
   Teacher,
@@ -17,9 +17,8 @@ const {
 const { Op } = require("sequelize");
 
 class CourseRepository {
-  async create(courseData, transaction = null) {
-    const options = transaction ? { transaction } : {};
-    return await Course.create(courseData, options);
+  async create(courseData, transaction) {
+    return await Course.create(courseData, { transaction });
   }
 
   async findById(id, options = {}) {
@@ -28,7 +27,7 @@ class CourseRepository {
         {
           model: Teacher,
           as: "teacher",
-          include: [{ model: User, as: "user" }],
+          include: [{ model: User, as: "user", attributes: ["name", "email"] }],
         },
         { model: Semester, as: "semester" },
       ],
@@ -80,69 +79,63 @@ class CourseRepository {
   }
 
   // Course component methods
-  async createCourseOutcome(courseId, outcomesData, transaction = null) {
-    const options = transaction ? { transaction } : {};
+  async createCourseOutcome(courseId, outcomesData, transaction) {
     return await CourseOutcome.create(
       {
         courseId,
         outcomes: outcomesData,
       },
-      options
+      { transaction }
     );
   }
 
-  async createCourseSchedule(courseId, scheduleData, transaction = null) {
-    const options = transaction ? { transaction } : {};
+  async createCourseSchedule(courseId, scheduleData, transaction) {
     return await CourseSchedule.create(
       {
         courseId,
         ...scheduleData,
       },
-      options
+      { transaction }
     );
   }
 
-  async createCourseSyllabus(courseId, modulesData, transaction = null) {
-    const options = transaction ? { transaction } : {};
+  async createCourseSyllabus(courseId, modulesData, transaction) {
     return await CourseSyllabus.create(
       {
         courseId,
         modules: modulesData,
       },
-      options
+      { transaction }
     );
   }
 
-  async createWeeklyPlan(courseId, weeksData, transaction = null) {
-    const options = transaction ? { transaction } : {};
+  async createWeeklyPlan(courseId, weeksData, transaction) {
     return await WeeklyPlan.create(
       {
         courseId,
         weeks: weeksData,
       },
-      options
+      { transaction }
     );
   }
 
-  async createCreditPoints(courseId, creditPointsData, transaction = null) {
-    const options = transaction ? { transaction } : {};
+  async createCreditPoints(courseId, creditPointsData, transaction) {
     return await CreditPoints.create(
       {
         courseId,
         ...creditPointsData,
       },
-      options
+      { transaction }
     );
   }
 
-  async createCourseAttendance(courseId, sessionsData, transaction = null) {
-    const options = transaction ? { transaction } : {};
+  async createCourseAttendance(courseId, sessionsData, transaction) {
     return await CourseAttendance.create(
       {
         courseId,
         sessions: sessionsData,
       },
-      options
+      { transaction }
     );
   }
 
