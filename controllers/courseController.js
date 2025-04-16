@@ -64,20 +64,8 @@ const formatCourseData = (course) => {
     }));
   }
 
-  // Format assignments
-  let assignments = [];
-  if (course.assignments && course.assignments.length > 0) {
-    assignments = course.assignments.map((assignment) => ({
-      id: assignment.id,
-      title: assignment.title,
-      description: assignment.description,
-      dueDate: assignment.dueDate,
-      totalPoints: assignment.totalPoints,
-      isActive: assignment.isActive,
-      attachments: assignment.attachments,
-      createdAt: assignment.createdAt,
-    }));
-  }
+  // Removed assignments formatting section as assignments will not be included
+  // Note: We get assignments separately through the assignments endpoint
 
   // Format learning outcomes
   let learningOutcomes = [];
@@ -128,7 +116,7 @@ const formatCourseData = (course) => {
     syllabus: syllabus,
     courseSchedule: courseSchedule,
     lectures: lectures,
-    assignments: assignments,
+    // Removed assignments from response
     attendance: course.attendance ? course.attendance.sessions : {},
   };
 };
@@ -309,7 +297,7 @@ const getCourseById = catchAsyncErrors(async (req, res, next) => {
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    // Find the course with its relationships
+    // Find the course with its relationships (excluding assignments)
     const course = await courseRepository.findById(courseId, {
       include: [
         { model: Semester, as: "semester" },
@@ -319,7 +307,7 @@ const getCourseById = catchAsyncErrors(async (req, res, next) => {
           include: [{ model: User, attributes: ["name", "email"], as: "user" }],
         },
         { model: Lecture, as: "lectures" },
-        { model: Assignment, as: "assignments" },
+        // Removed Assignment from include list
         { model: CourseOutcome, as: "outcomes" },
         { model: CourseSchedule, as: "schedule" },
         { model: CourseSyllabus, as: "syllabus" },
@@ -624,7 +612,7 @@ const createCourse = catchAsyncErrors(async (req, res, next) => {
     transaction = null;
     logger.info("Transaction committed successfully");
 
-    // Return the created course with its relationships
+    // Return the created course with its relationships (excluding assignments)
     const createdCourse = await courseRepository.findById(course.id, {
       include: [
         { model: Semester, as: "semester" },
@@ -822,7 +810,7 @@ const updateCourse = catchAsyncErrors(async (req, res, next) => {
     transaction = null;
     logger.info("Transaction committed successfully");
 
-    // Return the updated course with its relationships
+    // Return the updated course with its relationships (excluding assignments)
     const updatedCourse = await courseRepository.findById(course.id, {
       include: [
         { model: Semester, as: "semester" },

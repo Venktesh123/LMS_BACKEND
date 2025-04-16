@@ -50,6 +50,10 @@ module.exports = (sequelize) => {
         type: DataTypes.JSONB,
         allowNull: false,
         defaultValue: [],
+        get() {
+          const rawValue = this.getDataValue("attachments");
+          return rawValue || [];
+        },
       },
       isActive: {
         type: DataTypes.BOOLEAN,
@@ -60,6 +64,14 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: "Assignment",
+      // Add this hook to ensure attachments is always an array
+      hooks: {
+        beforeValidate: (assignment) => {
+          if (!assignment.attachments) {
+            assignment.attachments = [];
+          }
+        },
+      },
     }
   );
 
