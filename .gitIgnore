@@ -12,7 +12,6 @@ yarn-error.log
 .env.production.local
 
 # Config files with sensitive information
-config/config.json
 
 # Build output
 dist/

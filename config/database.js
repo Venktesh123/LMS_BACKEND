@@ -1,5 +1,5 @@
 const { Sequelize } = require("sequelize");
-const config = require("./config.json")[process.env.NODE_ENV || "development"];
+const config = require("./config")[process.env.NODE_ENV || "development"];
 
 // Force dialect to be postgres
 config.dialect = "postgres";
