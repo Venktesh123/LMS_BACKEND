@@ -6,7 +6,7 @@ module.exports = {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_DATABASE,
     host: process.env.DB_HOST,
-    port: +process.env.DB_PORT, // ensure port is a number
+    port: +process.env.DB_PORT,
     dialect: process.env.DB_DIALECT || "postgres",
     logging: true,
     define: {
@@ -34,9 +34,9 @@ module.exports = {
     },
   },
   production: {
-    username: process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_PROD_DATABASE,
+    username: process.env.DB_PROD_USERNAME || process.env.DB_USERNAME,
+    password: process.env.DB_PROD_PASSWORD || process.env.DB_PASSWORD,
+    database: process.env.DB_PROD_DATABASE || process.env.DB_DATABASE,
     host: process.env.DB_PROD_HOST || process.env.DB_HOST,
     port: +process.env.DB_PORT,
     dialect: process.env.DB_DIALECT || "postgres",
@@ -44,7 +44,7 @@ module.exports = {
     dialectOptions: {
       ssl: {
         require: true,
-        rejectUnauthorized: false,
+        rejectUnauthorized: false, // Required for AWS RDS connections
       },
     },
     define: {
